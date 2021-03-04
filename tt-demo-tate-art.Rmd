@@ -1,0 +1,143 @@
+---
+title: "Tidy Tuesday Demo - Tate Art"
+author: "Ludmila Janda"
+date: "1/13/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load package and data, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(scales)
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 3)
+artwork <- tuesdata$artwork
+artists <- tuesdata$artists
+```
+
+
+# Join artwork and artist datasets
+```{r left join}
+art_artists <- left_join(artwork, artists, by = c("artistId" = "id"))
+```
+
+
+# Create new variable that is the area of the art 
+```{r}
+art_artists$area <- art_artists$height * art_artists$width
+```
+
+
+# Graph art size in relation to gender - boxplot
+```{r}
+art_artists %>% 
+ggplot(aes(area, gender)) + 
+  geom_boxplot() + 
+  scale_x_continuous(labels = comma) +
+  theme_minimal() + 
+  labs(y = NULL, x = "Area", 
+       title = "Who Makes Bigger Art") 
+```
+
+# Remove outliers
+```{r}
+summary(art_artists$area)
+121706 + (IQR(art_artists$area, na.rm = TRUE) * 1.5)
+```
+
+# Graph art size in relation to gender - boxplot
+```{r}
+art_artists %>% 
+    filter(area < 278463.5, 
+         !is.na(gender)) %>% 
+  ggplot(aes(area, gender)) + 
+  geom_boxplot() + 
+  scale_x_continuous(labels = comma) +
+  theme_minimal() + 
+  labs(y = NULL, x = "Area", 
+       title = "Who Makes Bigger Art") 
+```
+
+# Graph art size in relation to gender - ridgeplot
+```{r}
+library(ggridges)
+
+art_artists %>% 
+  filter(area < 278463.5, 
+         !is.na(gender), 
+         !is.na(year)) %>% 
+  mutate(century = (floor(year / 100)) * 100) %>% 
+ggplot(aes(x = area, y = gender)) + 
+  geom_density_ridges(rel_min_height = 0.01, 
+                      jittered_points = TRUE, 
+                      position = "raincloud", 
+                      alpha = 0.1, scale = 0.5, 
+                      quantile_lines = TRUE,
+                      quantiles = 2) +
+  theme_minimal() + 
+  labs(y = NULL, x = "Area") + 
+  scale_x_continuous(labels = comma) + 
+  labs(y = NULL, x = "Area", 
+       title = "Who Makes Bigger Art") 
+```
+# Graph size of art over time
+```{r}
+art_artists %>% 
+  filter(!is.na(gender)) %>% 
+  ggplot(aes(year, area)) + 
+  geom_col() + 
+  scale_y_continuous(labels = comma) +
+  theme_minimal() + 
+  labs(y = "Area", x = "Year", 
+       title = "Art Area Over Time")
+```
+
+# Graph art size in relation to gender and time - ridgeplot
+```{r}
+art_artists %>% 
+  filter(area < 278463.5, 
+         !is.na(gender), 
+         !is.na(year)) %>% 
+  mutate(century = (floor(year / 100)) * 100) %>% 
+ggplot(aes(x = area, y = gender)) + 
+  geom_density_ridges(rel_min_height = 0.01, 
+                      jittered_points = TRUE, 
+                      position = "raincloud", 
+                      alpha = 0.1, scale = 0.5, 
+                      quantile_lines = TRUE,
+                      quantiles = 2) +
+  facet_wrap(~century) +
+  theme_minimal() + 
+  labs(y = NULL, x = "Area") + 
+  scale_x_continuous(labels = comma) + 
+  labs(y = NULL, x = "Area", 
+       title = "Who Makes Bigger Art by Century") 
+```
+
+
+
+# Quick and dirty regression
+```{r}
+a <- lm(area ~ gender + year, art_artists)
+summary(a)
+```
+
+
+# Quick and dirty regression with gender * year interaction
+```{r}
+a <- lm(area ~ gender + year + gender * year, art_artists)
+summary(a)
+```
+
+
+# Turner effect?
+```{r}
+t <- art_artists %>% mutate(turner = ifelse(artist == "Turner, Joseph Mallord William", 1, 0))
+a <- lm(area ~ gender + year + gender * year + turner, t)
+summary(a)
+```
+
